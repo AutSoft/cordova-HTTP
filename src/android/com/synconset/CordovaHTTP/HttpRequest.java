@@ -231,6 +231,11 @@ public class HttpRequest {
    */
   public static final String METHOD_OPTIONS = "OPTIONS";
 
+   /**
+   * 'PATCH' request method
+   */
+  //public static final String METHOD_PATCH = "PATCH";
+
   /**
    * 'POST' request method
    */
@@ -259,11 +264,11 @@ public class HttpRequest {
   private static final String CRLF = "\r\n";
 
   private static final String[] EMPTY_STRINGS = new String[0];
-  
+
   private static SSLSocketFactory PINNED_FACTORY;
 
   private static SSLSocketFactory TRUSTED_FACTORY;
-  
+
   private static ArrayList<Certificate> PINNED_CERTS;
 
   private static HostnameVerifier TRUSTED_VERIFIER;
@@ -274,7 +279,7 @@ public class HttpRequest {
     else
       return CHARSET_UTF8;
   }
-  
+
   private static SSLSocketFactory getPinnedFactory()
       throws HttpRequestException {
     if (PINNED_FACTORY != null) {
@@ -305,7 +310,7 @@ public class HttpRequest {
       try {
         SSLContext context = SSLContext.getInstance("TLS");
         context.init(null, trustAllCerts, new SecureRandom());
-        
+
         if (android.os.Build.VERSION.SDK_INT < 20) {
           TRUSTED_FACTORY = new TLSSocketFactory(context);
         } else {
@@ -429,8 +434,8 @@ public class HttpRequest {
     else
       CONNECTION_FACTORY = connectionFactory;
   }
-  
-  
+
+
   /**
   * Add a certificate to test against when using ssl pinning.
   *
@@ -447,27 +452,27 @@ public class HttpRequest {
       String keyStoreType = KeyStore.getDefaultType();
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
       keyStore.load(null, null);
-      
+
       for (int i = 0; i < PINNED_CERTS.size(); i++) {
         keyStore.setCertificateEntry("CA" + i, PINNED_CERTS.get(i));
       }
-      
+
       // Create a TrustManager that trusts the CAs in our KeyStore
       String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
       TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
       tmf.init(keyStore);
-      
+
       // Create an SSLContext that uses our TrustManager
       SSLContext sslContext = SSLContext.getInstance("TLS");
       sslContext.init(null, tmf.getTrustManagers(), null);
-      
+
       if (android.os.Build.VERSION.SDK_INT < 20) {
         PINNED_FACTORY = new TLSSocketFactory(sslContext);
       } else {
         PINNED_FACTORY = sslContext.getSocketFactory();
       }
   }
-  
+
   /**
   * Add a certificate to test against when using ssl pinning.
   *
@@ -1111,6 +1116,70 @@ public class HttpRequest {
     String url = append(baseUrl, params);
     return get(encode ? encode(url) : url);
   }
+
+  /**
+   * Start a 'PATCH' request to the given URL
+   *
+   * @param url
+   * @return request
+   * @throws HttpRequestException
+   */
+  // public static HttpRequest patch(final CharSequence url)
+  //     throws HttpRequestException {
+  //   return new HttpRequest(url, METHOD_PATCH);
+  // }
+
+  /**
+   * Start a 'PATCH' request to the given URL
+   *
+   * @param url
+   * @return request
+   * @throws HttpRequestException
+   */
+  // public static HttpRequest patch(final URL url) throws HttpRequestException {
+  //   return new HttpRequest(url, METHOD_PATCH);
+  // }
+
+  /**
+   * Start a 'PATCH' request to the given URL along with the query params
+   *
+   * @param baseUrl
+   * @param params
+   *          the query parameters to include as part of the baseUrl
+   * @param encode
+   *          true to encode the full URL
+   *
+   * @see #append(CharSequence, Map)
+   * @see #encode(CharSequence)
+   *
+   * @return request
+   */
+  // public static HttpRequest patch(final CharSequence baseUrl,
+  //     final Map<?, ?> params, final boolean encode) {
+  //   String url = append(baseUrl, params);
+  //   return patch(encode ? encode(url) : url);
+  // }
+
+  /**
+   * Start a 'PATCH' request to the given URL along with the query params
+   *
+   * @param baseUrl
+   * @param encode
+   *          true to encode the full URL
+   * @param params
+   *          the name/value query parameter pairs to include as part of the
+   *          baseUrl
+   *
+   * @see #append(CharSequence, String...)
+   * @see #encode(CharSequence)
+   *
+   * @return request
+   */
+  // public static HttpRequest patch(final CharSequence baseUrl,
+  //     final boolean encode, final Object... params) {
+  //   String url = append(baseUrl, params);
+  //   return patch(encode ? encode(url) : url);
+  // }
 
   /**
    * Start a 'POST' request to the given URL
@@ -3256,7 +3325,7 @@ public class HttpRequest {
         form(entry, charset);
     return this;
   }
-  
+
   /**
    * Configure HTTPS connection to trust only certain certificates
    * <p>
@@ -3275,7 +3344,7 @@ public class HttpRequest {
     }
     return this;
   }
-  
+
   /**
    * Configure HTTPS connection to trust all certificates
    * <p>
