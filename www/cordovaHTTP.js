@@ -46,6 +46,10 @@ var http = {
     validateDomainName: function(validate, success, failure) {
         return exec(success, failure, "CordovaHttpPlugin", "validateDomainName", [validate]);
     },
+    patchJson: function(url, json, headers, success, failure) {
+        headers = mergeHeaders(this.headers, headers);
+        return exec(success, failure, "CordovaHttpPlugin", "patchJson", [url, json, headers]);
+    },
     post: function(url, params, headers, success, failure) {
         headers = mergeHeaders(this.headers, headers);
         return exec(success, failure, "CordovaHttpPlugin", "post", [url, params, headers]);
@@ -167,6 +171,9 @@ if (typeof angular !== "undefined") {
             },
             validateDomainName: function(validate) {
                 return makePromise(http.validateDomainName, [validate]);
+            },
+            patchJson: function(url, json, headers) {
+                return makePromise(http.patchJson, [url, json, headers], true);
             },
             post: function(url, params, headers) {
                 return makePromise(http.post, [url, params, headers], true);
