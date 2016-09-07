@@ -39,6 +39,33 @@
     }
 }
 
+- (void)setResults:(NSMutableDictionary*)dictionary withTask:(NSURLSessionTask*)task forError:(NSError*)error {
+    [self setResults:dictionary withTask:task];
+
+    // NOTE: error isn't always the same as task.error
+    //NSLog(@"error %@ task.error", error == task.error ? @"==" : @"!=");
+
+    if (error) {
+        if (!dictionary[@"status"]) {
+            [dictionary setObject:@(error.code) forKey:@"status"];
+        }
+
+        NSString *errorResponseBody = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
+        if (errorResponseBody.length > 0) {
+            [dictionary setObject:errorResponseBody forKey:@"error"];
+        } else if ([error.domain isEqualToString:NSURLErrorDomain] && error.code == -999) {
+            // TODO: create a better error for SSL pinning failures.
+            // Until then, assume local URL domain cancel errors are SSL failures,
+            // and return the same error string as the java plugin does.
+            // NOTE: I'm unsure how this may affect uploads/downloads, since they
+            // may receive the same 'error' if they're cancelled. TODO: Check this!
+            [dictionary setObject:@"SSL handshake failed" forKey:@"error"];
+        } else {
+            [dictionary setObject:error.userInfo[NSLocalizedDescriptionKey] forKey:@"error"];
+        }
+    }
+}
+
 - (void)enableSSLPinning:(CDVInvokedUrlCommand*)command {
     bool enable = [[command.arguments objectAtIndex:0] boolValue];
     if (enable) {
@@ -92,9 +119,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
    }];
@@ -118,9 +143,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -146,9 +169,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -173,50 +194,10 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-
-        // This original code assumes only server-generated errors and doesn't catch client-initiated errors like SSL pinning failures
-        //NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        //[dictionary setObject:errResponse forKey:@"error"];
-
-        // This would be nice, but the java plugin returns strings, so unless we change that too...
-        //NSMutableDictionary *errorDictionary = [self getDictionaryFromError:error];
-        //[dictionary setObject:errorDictionary forKey:@"error"];
-
-        // Add support for client-side as well as server-side errors
-        [self addErrorResponseForError:error toDictionary:dictionary];
-        
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
-}
-
-//- (NSMutableDictionary *)getDictionaryFromError:(NSError *)error {
-//    NSMutableDictionary *userInfoResult = [NSMutableDictionary dictionary];
-//    [error.userInfo enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
-//        NSString *value = [obj isKindOfClass:[NSURL class]] ? [(NSURL *)obj absoluteString] : (NSString *)obj;
-//        [userInfoResult setValue:value forKey:key];
-//    }];
-//    NSMutableDictionary *errorResult = [NSMutableDictionary dictionaryWithDictionary:@{ @"domain": error.domain, @"code": @(error.code), @"userInfo": userInfoResult }];
-//    
-//    return errorResult;
-//}
-
-- (void)addErrorResponseForError:(NSError *)error toDictionary:(NSMutableDictionary *)dictionary {
-    if (!dictionary[@"status"]) {
-        [dictionary setObject:@(error.code) forKey:@"status"];
-    }
-
-    NSString *errorResponseBody = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-    if (errorResponseBody.length > 0) {
-        [dictionary setObject:errorResponseBody forKey:@"error"];
-    } else if ([error.domain isEqualToString:NSURLErrorDomain] && error.code == -999) {
-        // assume local URL domain cancel errors are SSL pinning failures,
-        // and return the same error string as the java plugin does.
-        [dictionary setObject:@"SSL handshake failed" forKey:@"error"];
-    } else {
-        [dictionary setObject:error.userInfo[NSLocalizedDescriptionKey] forKey:@"error"];
-    }
 }
 
 - (void)put:(CDVInvokedUrlCommand*)command {
@@ -237,9 +218,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -265,9 +244,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -291,9 +268,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -318,9 +293,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -359,9 +332,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -442,9 +413,7 @@
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } failure:^(NSURLSessionTask *task, NSError *error) {
         NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-        [self setResults: dictionary withTask: task];
-        NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-        [dictionary setObject:errResponse forKey:@"error"];
+        [self setResults:dictionary withTask: task forError:error];
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:dictionary];
         [weakSelf.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
